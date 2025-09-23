@@ -21,13 +21,12 @@ and reports which repos contain any package@version listed in an input file.
 
 1. Rename `env.example` to `.env`.
 2. Insert your GitHub PAT token.
-
-> [!NOTE]
-> The token needs access to your organisation's repos (scope: repo). Make sure the owner of the PAT is set to the target org.
-
 3. Edit the `affected.txt` to contain your targeted packages.
 4. Start the scanner:
 
 ```bash
 node sbom-scan.mjs --org <ORG>
 ```
+
+> [!NOTE]
+> The token needs access to your organisation's repos (scope: repo). Make sure the owner of the PAT is set to the target org.
