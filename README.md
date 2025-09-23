@@ -25,7 +25,7 @@ and reports which repos contain any package@version listed in an input file.
 4. Start the scanner:
 
 ```bash
-node sbom-scan.mjs --org <ORG>
+node sbom-scan.mjs --org=<ORG>
 ```
 
 > [!NOTE]
