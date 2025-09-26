@@ -39,6 +39,7 @@ dotenv.config();
 import { Octokit } from "octokit";
 import { readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
+import semver from "semver";
 
 // -------------------- CLI args --------------------
 const args = Object.fromEntries(
@@ -64,6 +65,24 @@ if (!process.env.GITHUB_TOKEN) {
 }
 
 // -------------------- Helpers --------------------
+function parsePkgNameVersionFromSpdx(p) {
+  const n = (p.name || "").toString();
+  const v = (p.versionInfo || "").toString();
+  if (n && semver.valid(v)) return { name: n, version: v };
+
+  // fallback: try purl
+  const ext = Array.isArray(p.externalRefs) ? p.externalRefs : [];
+  const purl = ext.find((e) => e?.referenceType === "purl")?.referenceLocator;
+  if (typeof purl === "string" && purl.startsWith("pkg:npm/")) {
+    const m = purl.match(/^pkg:npm\/(.+)@(.+)$/);
+    if (m) {
+      const pathPart = decodeURIComponent(m[1]); // may include @scope/name
+      const version = m[2];
+      if (semver.valid(version)) return { name: pathPart, version };
+    }
+  }
+  return null;
+}
 function parseLine(line) {
   const s = line.trim();
   if (!s || s.startsWith("#")) return null;
@@ -127,13 +146,17 @@ async function pool(items, limit, worker) {
 const lines = readFileSync(IN, "utf8").split(/\r?\n/);
 const entries = lines.map(parseLine).filter(Boolean);
 
-// Build lookup sets for fast matching
-const wantedPurls = new Set();
-const wantedNameVer = new Set();
+// Build lookup: package-name (lowercased) -> maximum allowed version
+// If the input lists the same package multiple times, we keep the highest version
+// so that "repoVersion <= maxInputVersionForThatPackage" will match.
+const wantedMaxVersion = new Map(); // nameLower -> version
 for (const { name, version } of entries) {
-  const p = npmPurl(name, version);
-  if (p) wantedPurls.add(p);
-  wantedNameVer.add(keyNameVersion(name, version));
+  if (!semver.valid(version)) continue; // skip non-semver inputs
+  const key = name.toLowerCase();
+  const prev = wantedMaxVersion.get(key);
+  if (!prev || semver.gt(version, prev)) {
+    wantedMaxVersion.set(key, version);
+  }
 }
 
 // -------------------- Octokit --------------------
@@ -172,45 +195,18 @@ await pool(reposToScan, CONCURRENCY, async (repo) => {
     const sbom = res.data?.sbom;
     const pkgs = Array.isArray(sbom?.packages) ? sbom.packages : [];
 
-    // Build set of matches in this repo to avoid duping
+    // Build set of matches in this repo to avoid dupes
     const foundPairs = new Set();
 
     for (const p of pkgs) {
-      // Prefer purl match (npm only)
-      const ext = Array.isArray(p.externalRefs) ? p.externalRefs : [];
-      const purl = ext.find(
-        (e) => e?.referenceType === "purl",
-      )?.referenceLocator;
-
-      let matchedKey = null;
-
-      if (purl && typeof purl === "string" && purl.startsWith("pkg:npm/")) {
-        if (wantedPurls.has(purl)) {
-          // derive name@version from SPDX fields if present, else from purl
-          const n = (p.name || "").toString();
-          const v = (p.versionInfo || "").toString();
-          matchedKey = n && v ? keyNameVersion(n, v) : null;
-          if (!matchedKey) {
-            // fallback: parse name/version from purl path
-            const m = purl.match(/^pkg:npm\/(.+)@(.+)$/);
-            if (m) {
-              const pathPart = decodeURIComponent(m[1]); // may include @scope/name
-              const version = m[2];
-              matchedKey = keyNameVersion(pathPart, version);
-            }
-          }
-        }
-      } else {
-        // Fallback: name + version match (in case purl missing)
-        const n = (p.name || "").toString();
-        const v = (p.versionInfo || "").toString();
-        if (n && v && wantedNameVer.has(keyNameVersion(n, v))) {
-          matchedKey = keyNameVersion(n, v);
-        }
-      }
-
-      if (matchedKey) {
-        foundPairs.add(matchedKey);
+      const nv = parsePkgNameVersionFromSpdx(p);
+      if (!nv) continue;
+      const nameLower = nv.name.toLowerCase();
+      const maxAllowed = wantedMaxVersion.get(nameLower);
+      if (!maxAllowed) continue; // not a package we care about
+      // Match if repo's version <= input version
+      if (semver.lte(nv.version, maxAllowed)) {
+        foundPairs.add(keyNameVersion(nv.name, nv.version));
       }
     }
 
