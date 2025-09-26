@@ -36,3 +36,6 @@ node sbom-scan.mjs --org=<ORG>
 We are currently manually monitoring the packages from: [socket.dev](https://socket.dev/blog/ongoing-supply-chain-attack-targets-crowdstrike-npm-packages)
 
 Current affected packages: **526**
+
+[Link to Highlight](https://socket.dev/blog/ongoing-supply-chain-attack-targets-crowdstrike-npm-packages#:~:text=confirmed%20as%20affected%3A-,Total%20packages%3A%20526,-%40ahmedhfarag/ngx%2Dperfect)
+
