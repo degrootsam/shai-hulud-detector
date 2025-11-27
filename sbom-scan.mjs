@@ -195,7 +195,9 @@ await pool(reposToScan, CONCURRENCY, async (repo) => {
     );
     const sbom = res.data?.sbom;
     const pkgs = Array.isArray(sbom?.packages) ? sbom.packages : [];
-    console.log(`Found ${pkgs.length} packages`);
+    console.log(
+      `Found ${pkgs.length} packages in repository. Checking for matches with affected packages`,
+    );
 
     // Build set of matches in this repo to avoid dupes
     const foundPairs = new Set();
