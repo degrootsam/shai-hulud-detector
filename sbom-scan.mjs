@@ -186,6 +186,7 @@ const affectedMap = new Map(); // key = "name@version" => Set of "org/repo"
 
 await pool(reposToScan, CONCURRENCY, async (repo) => {
   const full = repo.full_name || `${ORG}/${repo.name}`;
+  console.log(`Scanning ${full}`);
   try {
     // SBOM for default branch head (SPDX JSON)
     const res = await octokit.request(
@@ -194,6 +195,7 @@ await pool(reposToScan, CONCURRENCY, async (repo) => {
     );
     const sbom = res.data?.sbom;
     const pkgs = Array.isArray(sbom?.packages) ? sbom.packages : [];
+    console.log(`Found ${pkgs.length} packages`);
 
     // Build set of matches in this repo to avoid dupes
     const foundPairs = new Set();
@@ -206,6 +208,9 @@ await pool(reposToScan, CONCURRENCY, async (repo) => {
       if (!maxAllowed) continue; // not a package we care about
       // Match if repo's version <= input version
       if (semver.lte(nv.version, maxAllowed)) {
+        console.log(
+          `Package ${p.name}@${p.version} matched with an affected version`,
+        );
         foundPairs.add(keyNameVersion(nv.name, nv.version));
       }
     }
@@ -213,6 +218,10 @@ await pool(reposToScan, CONCURRENCY, async (repo) => {
     for (const pair of foundPairs) {
       if (!affectedMap.has(pair)) affectedMap.set(pair, new Set());
       affectedMap.get(pair).add(full);
+    }
+
+    if (foundPairs.length === 0) {
+      console.log(`No affected packages found!`);
     }
   } catch (e) {
     // Common: 403 if dependency graph unavailable, or 404 if repo disabled/empty
@@ -235,6 +244,7 @@ for (const [pair, setRepos] of affectedMap.entries()) {
   const at = pair.lastIndexOf("@");
   const pkg = pair.slice(0, at);
   const ver = pair.slice(at + 1);
+
   matches.push({
     package: pkg,
     version: ver,
