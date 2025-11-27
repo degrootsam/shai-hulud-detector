@@ -1,7 +1,7 @@
 # Shai Hulud Detector (NPM Worm)
 
 Scans an org's repositories via GitHub's SBOM API (Dependency Graph)
-and reports which repos contain any package@version listed in an input file.
+and reports which repos contain any package@version listed in an input file (including older versions).
 
 ## Installation
 
@@ -25,7 +25,7 @@ and reports which repos contain any package@version listed in an input file.
 4. Start the scanner:
 
 ```bash
-node sbom-scan.mjs --org=<ORG>
+node sbom-scan.mjs --org=<ORG> [--in=affected.txt] [--out=matches.json] [--include-forks] [--include-archived] [--concurrency=6]
 ```
 
 > [!NOTE]
@@ -35,6 +35,6 @@ node sbom-scan.mjs --org=<ORG>
 
 We are currently manually monitoring the packages from: [socket.dev](https://socket.dev/blog/ongoing-supply-chain-attack-targets-crowdstrike-npm-packages)
 
-Current affected packages: **526**
+Current affected packages: **1055**
 
-[Link to Highlight](https://socket.dev/blog/ongoing-supply-chain-attack-targets-crowdstrike-npm-packages#:~:text=confirmed%20as%20affected%3A-,Total%20packages%3A%20526,-%40ahmedhfarag/ngx%2Dperfect)
+[Link to Highlight](https://www.netskope.com/blog/shai-hulud-2-0-aggressive-automated-one-of-fastest-spreading-npm-supply-chain-attacks-ever-observed#:~:text=Compromised%20npm%20packages)
